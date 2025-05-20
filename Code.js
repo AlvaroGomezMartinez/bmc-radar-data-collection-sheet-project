@@ -14,7 +14,7 @@
  */
 function onOpen() {
   SpreadsheetApp.getUi()
-    .createMenu("Data Collection Information")
+    .createMenu("📈 Data Collection Information 📉")
     .addItem("Create Weekly Sheets", "setupWeeklyBehaviorSheets")
     .addItem("Help", "helpInformation")
     .addToUi();
@@ -199,4 +199,11 @@ function insertBehaviorTrendChart() {
     .setPosition(11, 9, 0, 0);
 
   summarySheet.insertChart(chart.build());
+}
+
+function helpInformation() {
+  const html = HtmlService.createHtmlOutputFromFile("Help")
+    .setWidth(1000)
+    .setHeight(600);
+  SpreadsheetApp.getUi().showModalDialog(html, "Radar Data Collection Spreadsheet");
 }
