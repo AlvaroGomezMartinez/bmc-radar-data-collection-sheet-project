@@ -1,0 +1,9 @@
+# Local clasp configuration
+.clasp.json
+
+# VS Code settings
+.vscode/
+
+# Logs and system files
+*.log
+.DS_Store

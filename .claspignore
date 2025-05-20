@@ -1,0 +1,9 @@
+# Git and local dev files 
+.git/
+.gitignore
+.claspignore
+.clasp.json
+.vscode/
+README.md
+*.log
+.DS_Store
