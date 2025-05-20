@@ -34,6 +34,44 @@ function setupWeeklyBehaviorSheets() {
   const templateSheet = ss.getSheetByName("Week_Template");
   const summarySheet = ss.getSheetByName("Summary");
 
+  const weekSheets = ss.getSheets().filter(sheet => /^Week \d+$/.test(sheet.getName()));
+  let startingWeekNumber = 1;
+  let colIndex = 2; // default staring column for summary formulas
+  let clearSummary = true;
+
+  if (weekSheets.length > 0) {
+    const choice = ui.prompt(
+      "Weekly Sheets Detected",
+      "⚠️ This spreadsheet already has weekly sheets built in it.\n\nWhat do you want to do?\n\n" +
+      "Type DELETE to remove all existing weekly sheets.\n" +
+      "Type CONTINUE to keep them and start with the next available week number.\n" +
+      "Type CANCEL to abort the setup.",
+      ui.ButtonSet.OK_CANCEL
+    );
+
+    if (choice.getSelectedButton() !== ui.Button.OK) return;
+
+    const input = choice.getResponseText().trim().toUpperCase();
+
+    if (input === "DELETE") {
+      weekSheets.forEach(sheet => ss.deleteSheet(sheet));
+    } else if (input === "CONTINUE") {
+      const weekNumbers = weekSheets
+        .map(sheet => parseInt(sheet.getName().match(/\d+/)[0]))
+        .filter(num => !isNaN(num));
+      startingWeekNumber = Math.max(...weekNumbers) + 1;
+      clearSummary = false;
+
+      // Find the last used column in row 2, starting at B (col 2)
+      const row2 = summarySheet.getRange(2, 2, 1, summarySheet.getMaxColumns() - 1).getValues()[0];
+      const lastColUsed = row2.reduceRight((acc, val, idx) => (acc === null && val !== "" ? idx + 2 : acc), null);
+      colIndex = lastColUsed ? lastColUsed + 1 : 2;
+    } else {
+      ui.alert("Setup cancelled.");
+      return;
+    }
+  }
+
   // Ask for start date
   const dateResponse = ui.prompt("Start Date", "What day will you start collecting data? (MM/DD/YYYY)", ui.ButtonSet.OK_CANCEL);
   if (dateResponse.getSelectedButton() !== ui.Button.OK) return;
@@ -61,17 +99,28 @@ function setupWeeklyBehaviorSheets() {
     return;
   }
 
-  // Clear and setup summary sheet
-  summarySheet.getRange("A1:BD9").clearContent();
-  const rowLabels = ["=Week_Template!N9", "=Week_Template!N10", "=Week_Template!N11", "=Week_Template!N12", "=Week_Template!N13", "=Week_Template!N14", "=Week_Template!N15"];
-  summarySheet.getRange("A3:A9").setValues(rowLabels.map(label => [label]));
+  // Clear and setup summary sheet headers
+  if (clearSummary) {
+    summarySheet.getRange("A1:BD9").clearContent();
+    const rowLabels = [
+      "=Week_Template!N9",
+      "=Week_Template!N10",
+      "=Week_Template!N11",
+      "=Week_Template!N12",
+      "=Week_Template!N13",
+      "=Week_Template!N14",
+      "=Week_Template!N15",
+    ];
+    summarySheet.getRange("A3:A9").setValues(rowLabels.map((label) => [label]));
+    colIndex = 2;
+  }
 
   // Generate weekly sheets and collect formulas
   const sheetNames = [];
   let currentMonday = new Date(startDate);
 
-  for (let i = 1; i <= numWeeks; i++) {
-    const sheetName = `Week ${i}`;
+  for (let i = 0; i < numWeeks; i++) {
+    const sheetName = `Week ${startingWeekNumber + i}`;
     const newSheet = templateSheet.copyTo(ss).setName(sheetName);
     sheetNames.push(sheetName);
 
@@ -86,7 +135,6 @@ function setupWeeklyBehaviorSheets() {
   }
 
   // Build the summary formulas in B2: across for all 5 days x N weeks
-  let colIndex = 2; // Column B
   for (const sheetName of sheetNames) {
     // Dates Row (row 2): C2, E2, G2, I2, K2
     const dateCells = ["C2", "E2", "G2", "I2", "K2"];
@@ -96,12 +144,12 @@ function setupWeeklyBehaviorSheets() {
     }
   }
 
-  // Reset column pointer for behaviors
-  colIndex = 2;
+  // Reset column pointer for behavior formulas
+  let behaviorCol = clearSummary ? 2 : colIndex - 5 * sheetNames.length;
 
   // Behavior rows: 3–9 (Behavior 1–7)
   for (let behaviorRow = 9; behaviorRow <= 15; behaviorRow++) {
-    let col = 2;
+    let col = behaviorCol;
     for (const sheetName of sheetNames) {
       const behaviorCols = ["O", "Q", "S", "U", "W"];
       for (let i = 0; i < 5; i++) {
@@ -112,8 +160,12 @@ function setupWeeklyBehaviorSheets() {
     }
   }
 
-  summarySheet.getRange("E13:G19").clearContent();
-  // 🔁 Emoji colors and their target summary columns
+  // Clear emoji summary only if starting from scratch
+  if (clearSummary) {
+    summarySheet.getRange("E13:G19").clearContent();
+  }
+  
+  // 🔁 Build emoji colors and their target summary columns
   const emojis = [
     { symbol: "🟦", col: "E" },  // Blue
     { symbol: "🟧", col: "F" },  // Orange
@@ -143,7 +195,7 @@ function setupWeeklyBehaviorSheets() {
     }
   }
 
-  ui.alert(`${numWeeks} weekly sheets created and the summary sheet populated.`);
+  ss.toast(`${numWeeks} weekly sheets created starting with Week ${startingWeekNumber} and the summary sheet was also populated.`, "Setup Completed", 8);
 }
 
 // Helper: Get dates Mon–Fri starting from Monday
